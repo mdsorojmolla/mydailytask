@@ -24,7 +24,7 @@ export function AppShell({
       <aside className="fixed left-0 top-0 hidden h-screen w-64 border-r border-line bg-paper px-4 py-5 lg:block">
         <div className="flex h-full flex-col">
           <Link href="/home" className="focus-ring rounded-md px-2 py-1">
-            <span className="block text-lg font-semibold">Routine OS</span>
+            <span className="block text-lg font-semibold">My Day</span>
             <span className="text-xs text-muted">Personal daily system</span>
           </Link>
           <nav aria-label="Main" className="mt-10 flex flex-col gap-1">
@@ -49,7 +49,7 @@ export function AppShell({
       <header className="sticky top-0 z-20 border-b border-line bg-paper/95 px-5 py-3 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between">
           <Link href="/home" className="focus-ring rounded-md text-base font-semibold">
-            Routine OS
+            My Day
           </Link>
           <Link
             href="/settings"

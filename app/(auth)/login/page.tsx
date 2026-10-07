@@ -2,19 +2,20 @@ import { Chrome } from "lucide-react";
 import { signInWithGoogleAction } from "@/app/(auth)/login/actions";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams
 }: {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }) {
   const configured = hasSupabaseEnv();
-  const error = loginError(searchParams.error);
+  const params = await searchParams;
+  const error = loginError(params?.error);
 
   return (
     <main className="min-h-screen bg-paper px-5 py-8 text-ink">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center">
         <p className="mb-4 text-sm font-medium uppercase tracking-[0.18em] text-accent">
-          Routine OS
+          My Day
         </p>
         <h1 className="text-4xl font-semibold leading-tight">
           Your day, organized around what matters now.

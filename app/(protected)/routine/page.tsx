@@ -12,13 +12,14 @@ import { DAY_NAMES, formatTime, holidayRepeatLabel } from "@/lib/utils/dates";
 export default async function RoutinePage({
   searchParams
 }: {
-  searchParams: { error?: string; success?: string };
+  searchParams: Promise<{ error?: string; success?: string }>;
 }) {
+  const params = await searchParams;
   const { routine, classes, holidays } = await getRoutinePageData();
 
   return (
     <>
-      <PageMessage error={searchParams.error} success={searchParams.success} />
+      <PageMessage error={params.error} success={params.success} />
       <header className="mb-8">
         <p className="text-sm font-medium text-muted">Current Routine</p>
         <h1 className="mt-1 text-3xl font-semibold">

@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Routine OS",
-  description: "A personal daily routine and task management application."
+  title: "My Day",
+  description: "Personal routine and task flow management application."
 };
 
 export const viewport: Viewport = {

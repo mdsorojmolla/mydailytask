@@ -11,8 +11,9 @@ import type { ScheduledItem } from "@/lib/domain";
 export default async function HomePage({
   searchParams
 }: {
-  searchParams: { error?: string; success?: string };
+  searchParams: Promise<{ error?: string; success?: string }>;
 }) {
+  const params = await searchParams;
   const date = todayISO();
   const { user, settings, schedule } = await getHomeData(date);
   const greeting = getGreeting();
@@ -20,7 +21,7 @@ export default async function HomePage({
   return (
     <>
       <NotificationRuntime schedule={schedule} settings={settings} />
-      <PageMessage error={searchParams.error} success={searchParams.success} />
+      <PageMessage error={params.error} success={params.success} />
       {!settings.setupCompleted ? (
         <div className="mb-6 rounded-md border border-accent/30 bg-white px-4 py-3 text-sm text-accent">
           Finish setup when you are ready.{" "}

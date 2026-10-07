@@ -12,13 +12,14 @@ import { formatTime } from "@/lib/utils/dates";
 export default async function SettingsPage({
   searchParams
 }: {
-  searchParams: { error?: string; success?: string };
+  searchParams: Promise<{ error?: string; success?: string }>;
 }) {
+  const params = await searchParams;
   const { user, settings, activities } = await getSettingsPageData();
 
   return (
     <>
-      <PageMessage error={searchParams.error} success={searchParams.success} />
+      <PageMessage error={params.error} success={params.success} />
       <header className="mb-8">
         <h1 className="text-3xl font-semibold">Settings</h1>
         <p className="mt-2 text-sm text-muted">{user.email}</p>

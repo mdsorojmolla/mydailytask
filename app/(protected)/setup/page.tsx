@@ -10,13 +10,14 @@ import { getSetupData } from "@/lib/data";
 export default async function SetupPage({
   searchParams
 }: {
-  searchParams: { error?: string; success?: string };
+  searchParams: Promise<{ error?: string; success?: string }>;
 }) {
+  const params = await searchParams;
   const { user, settings } = await getSetupData();
 
   return (
     <>
-      <PageMessage error={searchParams.error} success={searchParams.success} />
+      <PageMessage error={params.error} success={params.success} />
       <header className="mb-8">
         <p className="text-sm font-medium text-muted">Welcome, {user.email}</p>
         <h1 className="mt-1 text-3xl font-semibold">Set up your daily system</h1>

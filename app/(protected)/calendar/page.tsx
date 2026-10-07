@@ -8,14 +8,15 @@ import { formatDateLong, parseISODate, todayISO, toISODate } from "@/lib/utils/d
 export default async function CalendarPage({
   searchParams
 }: {
-  searchParams: { date?: string; error?: string; success?: string };
+  searchParams: Promise<{ date?: string; error?: string; success?: string }>;
 }) {
-  const selectedDate = searchParams.date ?? todayISO();
+  const params = await searchParams;
+  const selectedDate = params.date ?? todayISO();
   const schedule = await getScheduleForDate(selectedDate);
 
   return (
     <>
-      <PageMessage error={searchParams.error} success={searchParams.success} />
+      <PageMessage error={params.error} success={params.success} />
       <header className="mb-8">
         <h1 className="text-3xl font-semibold">Calendar</h1>
         <p className="mt-2 text-sm text-muted">
