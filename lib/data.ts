@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import type {
@@ -15,7 +16,7 @@ import { buildDailySchedule } from "@/lib/schedule/engine";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseISODate, weekStartISO } from "@/lib/utils/dates";
 
-export async function requireUser() {
+export const requireUser = cache(async () => {
   const supabase = await createServerSupabaseClient();
   if (!supabase) redirect("/login?error=missing-env");
 
@@ -26,11 +27,10 @@ export async function requireUser() {
 
   if (error || !user) redirect("/login");
 
-  await ensureProfile(supabase, user);
-  const settings = await ensureSettings(supabase, user.id);
+  const settings = await ensureSettingsAndProfile(supabase, user);
 
   return { supabase, user, settings };
-}
+});
 
 export async function getHomeData(date: string) {
   const { supabase, user, settings } = await requireUser();
@@ -72,13 +72,12 @@ export async function getTasksPageData() {
 
 export async function getRoutinePageData() {
   const { supabase, user } = await requireUser();
-  const routine = await getOrCreateActiveRoutine(supabase, user.id);
-  const [classesResult, holidaysResult] = await Promise.all([
+  const [routine, classesResult, holidaysResult] = await Promise.all([
+    getOrCreateActiveRoutine(supabase, user.id),
     supabase
       .from("classes")
       .select("*")
       .eq("user_id", user.id)
-      .eq("routine_id", routine.id)
       .order("day_of_week")
       .order("start_time"),
     supabase
@@ -91,9 +90,13 @@ export async function getRoutinePageData() {
   if (classesResult.error) throw new Error(classesResult.error.message);
   if (holidaysResult.error) throw new Error(holidaysResult.error.message);
 
+  const classes = (classesResult.data ?? [])
+    .filter((c: any) => c.routine_id === routine.id)
+    .map(mapClass);
+
   return {
     routine,
-    classes: (classesResult.data ?? []).map(mapClass),
+    classes,
     holidays: (holidaysResult.data ?? []).map(mapHoliday)
   };
 }
@@ -157,9 +160,10 @@ async function getScheduleSource(
   date: string
 ): Promise<ScheduleSource> {
   const weekStart = weekStartISO(parseISODate(date));
-  const routine = await getOrCreateActiveRoutine(supabase, userId);
 
+  // Run routine check and all 6 schedule data queries in parallel
   const [
+    routine,
     classesResult,
     exceptionsResult,
     activitiesResult,
@@ -167,11 +171,11 @@ async function getScheduleSource(
     tasksResult,
     holidaysResult
   ] = await Promise.all([
+    getOrCreateActiveRoutine(supabase, userId),
     supabase
       .from("classes")
       .select("*")
-      .eq("user_id", userId)
-      .eq("routine_id", routine.id),
+      .eq("user_id", userId),
     supabase
       .from("class_exceptions")
       .select("*")
@@ -202,9 +206,14 @@ async function getScheduleSource(
     if (result.error) throw new Error(result.error.message);
   }
 
+  // Filter classes for the active routine in memory
+  const activeClasses = (classesResult.data ?? [])
+    .filter((c: any) => c.routine_id === routine.id)
+    .map(mapClass);
+
   return {
     settings,
-    classes: (classesResult.data ?? []).map(mapClass),
+    classes: activeClasses,
     classExceptions: (exceptionsResult.data ?? []).map(mapClassException),
     activities: (activitiesResult.data ?? []).map(mapActivity),
     activityHistory: (activityHistoryResult.data ?? []).map(mapActivityHistory),
@@ -238,22 +247,26 @@ async function ensureProfile(
   if (error) throw new Error(error.message);
 }
 
-async function ensureSettings(
+async function ensureSettingsAndProfile(
   supabase: ServerSupabaseClient,
-  userId: string
+  user: User
 ): Promise<AppSettings> {
+  // Fast path: settings already exist (99.9% of user requests)
   const { data, error } = await supabase
     .from("settings")
     .select("*")
-    .eq("user_id", userId)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (data) return mapSettings(data);
 
+  // Slow path: first-time setup only. Ensure profile exists before inserting settings
+  await ensureProfile(supabase, user);
+
   const { data: created, error: insertError } = await supabase
     .from("settings")
-    .insert({ user_id: userId })
+    .insert({ user_id: user.id })
     .select("*")
     .single();
 
@@ -261,31 +274,33 @@ async function ensureSettings(
   return mapSettings(created);
 }
 
-export async function getOrCreateActiveRoutine(
-  supabase: ServerSupabaseClient,
-  userId: string
-): Promise<Routine> {
-  const { data, error } = await supabase
-    .from("routines")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+export const getOrCreateActiveRoutine = cache(
+  async (
+    supabase: ServerSupabaseClient,
+    userId: string
+  ): Promise<Routine> => {
+    const { data, error } = await supabase
+      .from("routines")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) throw new Error(error.message);
-  if (data) return mapRoutine(data);
+    if (error) throw new Error(error.message);
+    if (data) return mapRoutine(data);
 
-  const { data: created, error: insertError } = await supabase
-    .from("routines")
-    .insert({ user_id: userId, name: "Current Routine", term: null, active: true })
-    .select("*")
-    .single();
+    const { data: created, error: insertError } = await supabase
+      .from("routines")
+      .insert({ user_id: userId, name: "Current Routine", term: null, active: true })
+      .select("*")
+      .single();
 
-  if (insertError) throw new Error(insertError.message);
-  return mapRoutine(created);
-}
+    if (insertError) throw new Error(insertError.message);
+    return mapRoutine(created);
+  }
+);
 
 type ServerSupabaseClient = NonNullable<
   Awaited<ReturnType<typeof createServerSupabaseClient>>

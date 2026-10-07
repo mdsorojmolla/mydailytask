@@ -50,6 +50,7 @@ export function DateStrip({ selectedDate, basePath }: DateStripProps) {
         <Link
           key={day.key}
           href={day.href}
+          prefetch={true}
           className={`flex-1 min-w-[58px] max-w-[72px] h-[82px] rounded-2xl flex flex-col items-center justify-center transition-all duration-200 active:scale-95 ${
             day.isSelected
               ? "bg-[#5B4DFB] text-white shadow-glow scale-[1.03]"

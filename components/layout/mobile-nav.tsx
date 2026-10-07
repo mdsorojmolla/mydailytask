@@ -22,6 +22,7 @@ export function MobileNav() {
         {/* Tab 1: Home */}
         <Link
           href="/home"
+          prefetch={true}
           aria-label="Home"
           className={`flex min-h-[44px] flex-1 flex-col items-center justify-center transition-all duration-200 active:scale-90 ${
             isHome ? "text-[#5B4DFB]" : "text-muted hover:text-ink"
@@ -38,6 +39,7 @@ export function MobileNav() {
         {/* Tab 2: Calendar */}
         <Link
           href="/calendar"
+          prefetch={true}
           aria-label="Calendar & Routine"
           className={`flex min-h-[44px] flex-1 flex-col items-center justify-center transition-all duration-200 active:scale-90 ${
             isCalendar ? "text-[#5B4DFB]" : "text-muted hover:text-ink"
@@ -66,6 +68,7 @@ export function MobileNav() {
         {/* Tab 3: Tasks */}
         <Link
           href="/tasks"
+          prefetch={true}
           aria-label="Tasks"
           className={`flex min-h-[44px] flex-1 flex-col items-center justify-center transition-all duration-200 active:scale-90 ${
             isTasks ? "text-[#5B4DFB]" : "text-muted hover:text-ink"
@@ -82,6 +85,7 @@ export function MobileNav() {
         {/* Tab 4: More / Profile */}
         <Link
           href="/settings"
+          prefetch={true}
           aria-label="More and settings"
           className={`flex min-h-[44px] flex-1 flex-col items-center justify-center transition-all duration-200 active:scale-90 ${
             isMore ? "text-[#5B4DFB]" : "text-muted hover:text-ink"
