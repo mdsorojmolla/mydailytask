@@ -10,7 +10,8 @@ const baseSource: ScheduleSource = {
     browserNotificationsEnabled: true,
     reminderBeforeMinutes: 15,
     quietHoursStart: null,
-    quietHoursEnd: null
+    quietHoursEnd: null,
+    selectedBatch: null
   },
   classes: [
     {

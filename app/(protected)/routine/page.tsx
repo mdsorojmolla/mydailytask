@@ -10,13 +10,24 @@ import { getRoutinePageData } from "@/lib/data";
 import type { UniversityClass } from "@/lib/domain";
 import { DAY_NAMES, formatTime, holidayRepeatLabel } from "@/lib/utils/dates";
 
+import { BatchSelectorModal } from "@/components/domain/batch-selector-modal";
+import { AdminRoutineManager } from "@/components/domain/admin-routine-manager";
+
 export default async function RoutinePage({
   searchParams
 }: {
-  searchParams: Promise<{ error?: string; success?: string; day?: string; action?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    success?: string;
+    day?: string;
+    action?: string;
+    changeBatch?: string;
+    reviewVersionId?: string;
+  }>;
 }) {
   const params = await searchParams;
-  const { routine, classes, holidays } = await getRoutinePageData();
+  const { user, settings, isAdmin, routine, classes, holidays, publishedRoutine, allVersions } =
+    await getRoutinePageData();
 
   // Determine active day (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
   const currentDayOfWeek = new Date().getDay();
@@ -24,7 +35,7 @@ export default async function RoutinePage({
   const defaultDayIndex = currentDayOfWeek >= 1 && currentDayOfWeek <= 5 ? currentDayOfWeek : 1;
   const selectedDay = params.day !== undefined ? (params.day === "all" ? "all" : parseInt(params.day, 10)) : defaultDayIndex;
   const showAddClass = params.action === "add";
-  const showUpload = params.action === "upload";
+  const isChangeBatch = params.changeBatch === "true";
 
   // Filter classes for selected day
   const displayedClasses =
@@ -67,7 +78,27 @@ export default async function RoutinePage({
         </div>
       </header>
 
-      {/* Drawer: Add Class Form */}
+      {/* Admin Central Routine Management: Only visible to mdsorojmolla20@gmail.com */}
+      {isAdmin ? (
+        <AdminRoutineManager
+          publishedVersion={publishedRoutine.version}
+          publishedBatches={publishedRoutine.batches}
+          allVersions={allVersions}
+          reviewVersionId={params.reviewVersionId}
+        />
+      ) : null}
+
+      {/* Academic Batch Selection & Switcher for Students */}
+      {publishedRoutine.batches.length > 0 ? (
+        <BatchSelectorModal
+          availableBatches={publishedRoutine.batches}
+          currentBatch={settings.selectedBatch}
+          returnTo="/routine"
+          isChangeMode={isChangeBatch}
+        />
+      ) : null}
+
+      {/* Drawer: Add Custom Class Form */}
       {showAddClass ? (
         <section className="rounded-2xl border border-[#EEECFE] bg-white p-5 shadow-card animate-in fade-in duration-200">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
@@ -77,19 +108,6 @@ export default async function RoutinePage({
             </Link>
           </div>
           <ClassForm returnTo="/routine" />
-        </section>
-      ) : null}
-
-      {/* Drawer: Upload Routine Form */}
-      {showUpload ? (
-        <section className="rounded-2xl border border-[#EEECFE] bg-white p-5 shadow-card animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-            <h2 className="text-sm font-bold tracking-tight text-ink">Upload Routine Schedule (PDF / Image)</h2>
-            <Link href="/routine" className="text-xs text-muted hover:text-ink font-semibold">
-              Cancel
-            </Link>
-          </div>
-          <RoutineUploadForm />
         </section>
       ) : null}
 

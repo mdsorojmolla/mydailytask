@@ -61,14 +61,20 @@ export default async function CalendarPage({
         </section>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-        {/* Monthly Calendar Grid */}
-        <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
-          <MonthGrid selectedDate={selectedDate} today={today} />
-        </section>
+      <div className="grid gap-6 lg:grid-cols-[340px_1fr] items-start">
+        {/* Monthly Calendar Grid: Sticky on desktop, collapsible on mobile */}
+        <aside className="self-start lg:sticky lg:top-8 rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-card transition-all">
+          <details className="group" open>
+            <summary className="flex lg:hidden cursor-pointer items-center justify-between font-bold text-xs text-[#5B4DFB] pb-2 select-none">
+              <span>Month Calendar</span>
+              <span className="text-[11px] text-muted group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <MonthGrid selectedDate={selectedDate} today={today} />
+          </details>
+        </aside>
 
-        {/* Selected Date Schedule */}
-        <section className="space-y-3">
+        {/* Selected Date Schedule: Full natural vertical scrolling */}
+        <section className="min-w-0 space-y-3 pb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
               <div className="flex items-center gap-2">

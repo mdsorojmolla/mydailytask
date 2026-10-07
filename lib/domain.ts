@@ -17,6 +17,7 @@ export type Profile = {
   id: UUID;
   fullName: string | null;
   avatarUrl: string | null;
+  selectedBatch?: string | null;
 };
 
 export type AppSettings = {
@@ -26,6 +27,41 @@ export type AppSettings = {
   reminderBeforeMinutes: number;
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
+  selectedBatch: string | null;
+};
+
+export type RoutineVersion = {
+  id: UUID;
+  versionName: string;
+  sourceFile: string | null;
+  fileName: string | null;
+  status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  uploadedBy: UUID | null;
+  publishedAt: string | null;
+  createdAt: string;
+  batchesCount?: number;
+  classesCount?: number;
+};
+
+export type RoutineBatch = {
+  id: UUID;
+  routineVersionId: UUID;
+  batchCode: string;
+};
+
+export type RoutineClass = {
+  id: UUID;
+  routineVersionId: UUID;
+  batchCode: string;
+  labGroup: string | null;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  courseCode: string;
+  teacher: string | null;
+  room: string | null;
+  classType: "Theory" | "Lab";
+  roomType?: string | null;
 };
 
 export type Routine = {

@@ -1,70 +1,82 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/data";
-
-const ACCEPTED_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp"
-]);
+import { isAdminUser } from "@/lib/auth/admin";
+import { extractTextFromPDF, parseRoutineText } from "@/lib/routine/parser";
+import { saveDraftRoutine } from "@/lib/routine/store";
 
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
+
+  // Strict server-side admin check
+  if (!isAdminUser(user)) {
+    return NextResponse.json(
+      { error: "Forbidden: Only the university routine administrator (mdsorojmolla20@gmail.com) can upload routine schedules." },
+      { status: 403 }
+    );
+  }
+
   const formData = await request.formData();
   const file = formData.get("file");
+  const versionName =
+    formData.get("versionName")?.toString().trim() ||
+    `Routine ${new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
 
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Upload a PDF or image." }, { status: 400 });
+    return NextResponse.json({ error: "Upload a valid PDF file." }, { status: 400 });
   }
 
-  if (!ACCEPTED_TYPES.has(file.type)) {
+  if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
     return NextResponse.json(
-      { error: "Routine uploads must be PDF, JPEG, PNG, or WebP." },
+      { error: "University routine upload must be a PDF document." },
       { status: 400 }
     );
   }
 
-  if (file.size > 10 * 1024 * 1024) {
+  if (file.size > 20 * 1024 * 1024) {
     return NextResponse.json(
-      { error: "Routine uploads must be 10 MB or smaller." },
+      { error: "Routine uploads must be 20 MB or smaller." },
       { status: 400 }
     );
   }
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  const path = `${user.id}/${crypto.randomUUID()}-${safeName}`;
-  const { error: uploadError } = await supabase.storage
-    .from("routine-uploads")
-    .upload(path, file, {
-      contentType: file.type,
-      upsert: false
+  try {
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const extractedText = await extractTextFromPDF(buffer);
+
+    if (!extractedText || extractedText.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Could not extract text from this PDF. Please ensure it contains selectable text." },
+        { status: 400 }
+      );
+    }
+
+    const parsed = parseRoutineText(extractedText);
+
+    // Save PDF to storage
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const path = `versions/${crypto.randomUUID()}-${safeName}`;
+    await supabase.storage.from("routine-uploads").upload(path, buffer, {
+      contentType: "application/pdf",
+      upsert: true
     });
 
-  if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    const { versionId } = await saveDraftRoutine(supabase, user, {
+      versionName,
+      fileName: file.name,
+      sourceFile: path,
+      batches: parsed.batches,
+      classes: parsed.classes
+    });
+
+    return NextResponse.json({
+      status: "DRAFT",
+      versionId,
+      batches: parsed.batches,
+      classesCount: parsed.classes.length,
+      message: `Routine parsed successfully! Discovered ${parsed.batches.length} batches and ${parsed.classes.length} classes. Ready for review.`
+    });
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
-
-  const { error: insertError } = await supabase.from("routine_uploads").insert({
-    user_id: user.id,
-    file_path: path,
-    file_type: file.type,
-    status: "REVIEW_REQUIRED",
-    extracted_payload: {
-      detectedClasses: [],
-      uncertainFields: [],
-      note: "File stored for review. Automatic extraction is intentionally not saved without confirmation."
-    }
-  });
-
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    status: "REVIEW_REQUIRED",
-    detectedClasses: [],
-    uncertainFields: [],
-    message:
-      "Routine file uploaded. Review it and add classes manually before saving."
-  });
 }

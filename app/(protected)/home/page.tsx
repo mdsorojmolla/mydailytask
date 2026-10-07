@@ -9,6 +9,7 @@ import { NowPanel, Timeline } from "@/components/domain/timeline";
 import { rescheduleTaskAction } from "@/app/actions/tasks";
 import { Button } from "@/components/ui/button";
 import { PriorityPill } from "@/components/ui/status";
+import { BatchSelectorModal } from "@/components/domain/batch-selector-modal";
 import type { ScheduledItem } from "@/lib/domain";
 
 export default async function HomePage({
@@ -18,7 +19,7 @@ export default async function HomePage({
 }) {
   const params = await searchParams;
   const date = params.date || todayISO();
-  const { user, settings, schedule } = await getHomeData(date);
+  const { user, settings, publishedRoutine, schedule } = await getHomeData(date);
   
   const firstName =
     user.user_metadata?.full_name?.split(" ")[0] ??
@@ -68,6 +69,15 @@ export default async function HomePage({
       <section aria-label="Date selector">
         <DateStrip selectedDate={date} basePath="/home" />
       </section>
+
+      {/* Batch Selection Prompt: If routine published and user has not selected batch */}
+      {publishedRoutine.batches.length > 0 && !settings.selectedBatch ? (
+        <BatchSelectorModal
+          availableBatches={publishedRoutine.batches}
+          currentBatch={settings.selectedBatch}
+          returnTo={`/home?date=${date}`}
+        />
+      ) : null}
 
       {/* Compact Contextual Setup Indicator */}
       {!settings.setupCompleted ? (

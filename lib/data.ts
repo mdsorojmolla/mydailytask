@@ -15,6 +15,8 @@ import type {
 import { buildDailySchedule } from "@/lib/schedule/engine";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { parseISODate, weekStartISO } from "@/lib/utils/dates";
+import { isAdminUser } from "@/lib/auth/admin";
+import { getAllRoutineVersions, getPublishedRoutine } from "@/lib/routine/store";
 
 export const requireUser = cache(async () => {
   const supabase = await createServerSupabaseClient();
@@ -29,15 +31,23 @@ export const requireUser = cache(async () => {
 
   const settings = await ensureSettingsAndProfile(supabase, user);
 
+  if (!settings.selectedBatch && typeof user.user_metadata?.selected_batch === "string") {
+    settings.selectedBatch = user.user_metadata.selected_batch;
+  }
+
   return { supabase, user, settings };
 });
 
 export async function getHomeData(date: string) {
   const { supabase, user, settings } = await requireUser();
-  const source = await getScheduleSource(supabase, user.id, settings, date);
+  const [source, publishedData] = await Promise.all([
+    getScheduleSource(supabase, user.id, settings, date),
+    getPublishedRoutine(supabase)
+  ]);
   return {
     user,
     settings,
+    publishedRoutine: publishedData,
     schedule: buildDailySchedule({ date, source })
   };
 }
@@ -71,8 +81,10 @@ export async function getTasksPageData() {
 }
 
 export async function getRoutinePageData() {
-  const { supabase, user } = await requireUser();
-  const [routine, classesResult, holidaysResult] = await Promise.all([
+  const { supabase, user, settings } = await requireUser();
+  const isAdmin = isAdminUser(user);
+
+  const [routine, classesResult, holidaysResult, publishedData, allVersions] = await Promise.all([
     getOrCreateActiveRoutine(supabase, user.id),
     supabase
       .from("classes")
@@ -84,7 +96,9 @@ export async function getRoutinePageData() {
       .from("holidays")
       .select("*")
       .eq("user_id", user.id)
-      .order("date")
+      .order("date"),
+    getPublishedRoutine(supabase),
+    isAdmin ? getAllRoutineVersions(supabase) : Promise.resolve([])
   ]);
 
   if (classesResult.error) throw new Error(classesResult.error.message);
@@ -95,9 +109,14 @@ export async function getRoutinePageData() {
     .map(mapClass);
 
   return {
+    user,
+    settings,
+    isAdmin,
     routine,
     classes,
-    holidays: (holidaysResult.data ?? []).map(mapHoliday)
+    holidays: (holidaysResult.data ?? []).map(mapHoliday),
+    publishedRoutine: publishedData,
+    allVersions
   };
 }
 
@@ -313,7 +332,8 @@ function mapSettings(row: any): AppSettings {
     browserNotificationsEnabled: row.browser_notifications_enabled,
     reminderBeforeMinutes: row.reminder_before_minutes,
     quietHoursStart: row.quiet_hours_start?.slice(0, 5) ?? null,
-    quietHoursEnd: row.quiet_hours_end?.slice(0, 5) ?? null
+    quietHoursEnd: row.quiet_hours_end?.slice(0, 5) ?? null,
+    selectedBatch: row.selected_batch ?? null
   };
 }
 

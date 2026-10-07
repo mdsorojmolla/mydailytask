@@ -4,6 +4,7 @@ import {
   BookOpen,
   Calendar,
   ChevronRight,
+  GraduationCap,
   Info,
   LineChart,
   LogOut,
@@ -133,19 +134,21 @@ export default async function SettingsPage({
           </Link>
 
           <Link
-            href="/routine?action=upload"
+            href="/routine?changeBatch=true"
             className="flex items-center justify-between p-3.5 hover:bg-stone-50 active:bg-stone-100 transition"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-700">
-                <Upload size={17} />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEECFE] text-[#5B4DFB]">
+                <GraduationCap size={17} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-ink">Upload Routine Document</p>
-                <p className="text-xs text-muted">Upload PDF or image to extract and review</p>
+                <p className="text-sm font-semibold text-ink">
+                  Academic Batch: {settings.selectedBatch || "Not selected"}
+                </p>
+                <p className="text-xs text-muted">Change your CSE batch section</p>
               </div>
             </div>
-            <ChevronRight size={16} className="text-muted" />
+            <span className="text-xs font-bold text-[#5B4DFB]">Change</span>
           </Link>
 
           <Link
