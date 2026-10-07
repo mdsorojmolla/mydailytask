@@ -12,23 +12,28 @@ export default async function LoginPage({
   const error = loginError(params?.error);
 
   return (
-    <main className="min-h-screen bg-paper px-5 py-8 text-ink">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center">
-        <p className="mb-4 text-sm font-medium uppercase tracking-[0.18em] text-accent">
-          My Day
-        </p>
-        <h1 className="text-4xl font-semibold leading-tight">
+    <main className="min-h-dvh bg-paper px-5 py-8 pt-[max(2rem,env(safe-area-inset-top,0px))] pb-[max(2rem,env(safe-area-inset-bottom,0px))] text-ink">
+      <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-md flex-col justify-center">
+        <div className="mb-4 flex items-center gap-2.5">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#5B4DFB] text-sm font-extrabold text-white shadow-glow">
+            MD
+          </span>
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#5B4DFB]">
+            My Day
+          </p>
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight text-ink">
           Your day, organized around what matters now.
         </h1>
-        <p className="mt-4 text-base leading-7 text-muted">
+        <p className="mt-3 text-sm leading-relaxed text-muted">
           Sign in with Google to keep your routine, tasks, activities, and
-          reminders private to your account.
+          reminders synchronized in your personal productivity space.
         </p>
 
         {error ? (
           <div
             role="alert"
-            className="mt-8 rounded-md border border-danger/30 bg-white px-4 py-3 text-sm text-danger"
+            className="mt-6 rounded-2xl border border-rose-200 bg-white px-4 py-3 text-xs font-semibold text-rose-600 shadow-card"
           >
             {error}
           </div>
@@ -37,10 +42,10 @@ export default async function LoginPage({
         {!configured ? (
           <div
             role="status"
-            className="mt-8 rounded-md border border-warning/30 bg-white px-4 py-3 text-sm leading-6 text-warning"
+            className="mt-6 rounded-2xl border border-amber-200 bg-white px-4 py-3.5 text-xs font-medium leading-relaxed text-amber-700 shadow-card"
           >
             Supabase environment variables are not configured yet. Add them to
-            <span className="font-mono"> .env.local</span> before signing in.
+            <span className="font-mono font-bold"> .env.local</span> before signing in.
           </div>
         ) : null}
 
@@ -48,9 +53,9 @@ export default async function LoginPage({
           <button
             type="submit"
             disabled={!configured}
-            className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-line bg-ink px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#29342e] disabled:cursor-not-allowed disabled:bg-muted"
+            className="focus-ring inline-flex min-h-12 w-full select-none items-center justify-center gap-2.5 rounded-2xl bg-[#5B4DFB] px-5 py-3 text-sm font-bold text-white shadow-glow transition-all active:scale-[0.98] touch-manipulation hover:bg-[#483AE3] disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            <Chrome aria-hidden="true" size={18} />
+            <Chrome aria-hidden="true" size={20} />
             Continue with Google
           </button>
         </form>

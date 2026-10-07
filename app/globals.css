@@ -1,28 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: light;
-  background: #fbfaf7;
+  background: #F7F8FD;
 }
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  background: #fbfaf7;
-  color: #1f2723;
+  background-color: #F7F8FD;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(220, 235, 255, 0.4) 0px, transparent 50%),
+    radial-gradient(at 100% 10%, rgba(238, 236, 254, 0.45) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(243, 240, 255, 0.3) 0px, transparent 50%);
+  background-attachment: fixed;
+  color: #1A1D2E;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    var(--font-sans), "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  letter-spacing: 0;
+  letter-spacing: -0.01em;
+  overscroll-behavior-y: none;
 }
 
 button,
@@ -30,6 +40,7 @@ input,
 select,
 textarea {
   font: inherit;
+  touch-action: manipulation;
 }
 
 button,
@@ -48,3 +59,15 @@ textarea {
 .focus-ring {
   @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
 }
+
+/* Mobile App Native Insets */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
