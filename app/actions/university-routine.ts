@@ -52,7 +52,6 @@ export async function uploadAndParseRoutineAction(formData: FormData) {
     assertAdmin(user);
 
     const file = formData.get("file");
-    const versionName = formData.get("versionName")?.toString().trim() || `Routine ${new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
 
     if (!(file instanceof File)) {
       redirectWithMessage(path, "error", "Please select a valid PDF file.");
@@ -95,13 +94,24 @@ export async function uploadAndParseRoutineAction(formData: FormData) {
       upsert: true
     });
 
+    const rawVersionName = formData.get("versionName")?.toString().trim();
+    const versionName = rawVersionName && rawVersionName !== "Routine V4.1"
+      ? rawVersionName
+      : (parsed.versionName || "Routine V4.1");
+
     // Save as draft
     const { versionId } = await saveDraftRoutine(supabase, user, {
       versionName,
       fileName: file.name,
       sourceFile: storagePath,
       batches: parsed.batches,
-      classes: parsed.classes
+      classes: parsed.classes,
+      meta: {
+        effectiveFrom: parsed.effectiveFrom,
+        versionName: parsed.versionName,
+        totalClasses: parsed.stats.totalClasses,
+        daysWithClasses: parsed.stats.daysWithClasses
+      }
     });
 
     revalidatePath("/routine");

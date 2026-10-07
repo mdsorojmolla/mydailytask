@@ -2,7 +2,8 @@
 const nextConfig = {
   typedRoutes: false,
   poweredByHeader: false,
-  compress: true
+  compress: true,
+  serverExternalPackages: ["pdf-parse"]
 };
 
 export default nextConfig;

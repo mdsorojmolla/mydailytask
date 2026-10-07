@@ -230,6 +230,7 @@ export async function saveDraftRoutine(
     sourceFile?: string;
     batches: string[];
     classes: Omit<RoutineClass, "id" | "routineVersionId">[];
+    meta?: Record<string, unknown>;
   }
 ): Promise<{ versionId: string }> {
   assertAdmin(currentUser);
@@ -243,7 +244,8 @@ export async function saveDraftRoutine(
         file_name: data.fileName ?? null,
         source_file: data.sourceFile ?? null,
         status: "DRAFT",
-        uploaded_by: currentUser.id
+        uploaded_by: currentUser.id,
+        meta: data.meta ?? null
       })
       .select("id")
       .single();
