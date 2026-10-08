@@ -31,8 +31,8 @@ export default async function RoutinePage({
 
   // Determine active day (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
   const currentDayOfWeek = new Date().getDay();
-  // Default to today if it's a weekday (1..5), else Monday (1)
-  const defaultDayIndex = currentDayOfWeek >= 1 && currentDayOfWeek <= 5 ? currentDayOfWeek : 1;
+  // Default to today if it's an active class day (0..4: Sun..Thu), else Sunday (0)
+  const defaultDayIndex = currentDayOfWeek >= 0 && currentDayOfWeek <= 4 ? currentDayOfWeek : 0;
   const selectedDay = params.day !== undefined ? (params.day === "all" ? "all" : parseInt(params.day, 10)) : defaultDayIndex;
   const showAddClass = params.action === "add";
   const isChangeBatch = params.changeBatch === "true";
@@ -46,7 +46,7 @@ export default async function RoutinePage({
   // Group classes by day for "all" view
   const daysToDisplay =
     selectedDay === "all"
-      ? [1, 2, 3, 4, 5, 6, 0]
+      ? [0, 1, 2, 3, 4, 5, 6]
       : [selectedDay as number];
 
   return (
@@ -117,13 +117,13 @@ export default async function RoutinePage({
         className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar"
       >
         {[
+          { index: 0, label: "Sun", full: "Sunday" },
           { index: 1, label: "Mon", full: "Monday" },
           { index: 2, label: "Tue", full: "Tuesday" },
           { index: 3, label: "Wed", full: "Wednesday" },
           { index: 4, label: "Thu", full: "Thursday" },
           { index: 5, label: "Fri", full: "Friday" },
-          { index: 6, label: "Sat", full: "Saturday" },
-          { index: 0, label: "Sun", full: "Sunday" }
+          { index: 6, label: "Sat", full: "Saturday" }
         ].map((day) => {
           const isToday = currentDayOfWeek === day.index;
           const isSelected = selectedDay === day.index;

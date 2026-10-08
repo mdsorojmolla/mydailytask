@@ -9,7 +9,12 @@ import {
   saveDraftRoutine,
   syncUserWeeklyRoutine
 } from "@/lib/routine/store";
-import { redirectWithMessage, returnTo } from "@/app/actions/helpers";
+import {
+  errorMessage,
+  redirectWithMessage,
+  returnTo,
+  rethrowIfRedirect
+} from "@/app/actions/helpers";
 
 /**
  * User action: Selects or changes their academic batch (e.g. 71_B)
@@ -22,23 +27,26 @@ export async function selectUserBatchAction(formData: FormData) {
     redirectWithMessage(path, "error", "Please select a valid CSE Batch.");
   }
 
+  let classesCreated = 0;
   try {
     const { supabase, user } = await requireUser();
     const result = await syncUserWeeklyRoutine(supabase, user.id, batchCode);
+    classesCreated = result.classesCreated;
 
     revalidatePath("/home");
     revalidatePath("/routine");
     revalidatePath("/calendar");
     revalidatePath("/settings");
-
-    redirectWithMessage(
-      path,
-      "success",
-      `Batch ${batchCode} selected! Loaded ${result.classesCreated} weekly classes into your routine.`
-    );
   } catch (error) {
-    redirectWithMessage(path, "error", (error as Error).message);
+    rethrowIfRedirect(error);
+    redirectWithMessage(path, "error", errorMessage(error));
   }
+
+  redirectWithMessage(
+    path,
+    "success",
+    `Batch ${batchCode} selected! Loaded ${classesCreated} weekly classes into your routine.`
+  );
 }
 
 /**
@@ -46,6 +54,9 @@ export async function selectUserBatchAction(formData: FormData) {
  */
 export async function uploadAndParseRoutineAction(formData: FormData) {
   const path = returnTo(formData, "/routine");
+  let versionId = "";
+  let batchesCount = 0;
+  let classesCount = 0;
 
   try {
     const { supabase, user } = await requireUser();
@@ -54,18 +65,15 @@ export async function uploadAndParseRoutineAction(formData: FormData) {
     const file = formData.get("file");
 
     if (!(file instanceof File)) {
-      redirectWithMessage(path, "error", "Please select a valid PDF file.");
-      return;
+      throw new Error("Please select a valid PDF file.");
     }
 
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      redirectWithMessage(path, "error", "The routine file must be a PDF document.");
-      return;
+      throw new Error("The routine file must be a PDF document.");
     }
 
     if (file.size > 20 * 1024 * 1024) {
-      redirectWithMessage(path, "error", "PDF size must be 20 MB or smaller.");
-      return;
+      throw new Error("PDF size must be 20 MB or smaller.");
     }
 
     // Read buffer and extract text
@@ -74,15 +82,13 @@ export async function uploadAndParseRoutineAction(formData: FormData) {
 
     const extractedText = await extractTextFromPDF(buffer);
     if (!extractedText || extractedText.trim().length === 0) {
-      redirectWithMessage(path, "error", "Could not extract text from this PDF. Please ensure it contains selectable text, not scanned images.");
-      return;
+      throw new Error("Could not extract text from this PDF. Please ensure it contains selectable text, not scanned images.");
     }
 
     const parsed = parseRoutineText(extractedText);
 
     if (parsed.batches.length === 0) {
-      redirectWithMessage(path, "error", "No academic batches (e.g. 71_B, 71_A) detected in the uploaded PDF.");
-      return;
+      throw new Error("No academic batches (e.g. 71_B, 71_A) detected in the uploaded PDF.");
     }
 
     // Upload source file to storage
@@ -100,7 +106,7 @@ export async function uploadAndParseRoutineAction(formData: FormData) {
       : (parsed.versionName || "Routine V4.1");
 
     // Save as draft
-    const { versionId } = await saveDraftRoutine(supabase, user, {
+    const saved = await saveDraftRoutine(supabase, user, {
       versionName,
       fileName: file.name,
       sourceFile: storagePath,
@@ -114,15 +120,21 @@ export async function uploadAndParseRoutineAction(formData: FormData) {
       }
     });
 
+    versionId = saved.versionId;
+    batchesCount = parsed.batches.length;
+    classesCount = parsed.classes.length;
+
     revalidatePath("/routine");
-    redirectWithMessage(
-      `/routine?reviewVersionId=${versionId}`,
-      "success",
-      `Routine parsed successfully! Discovered ${parsed.batches.length} batches and ${parsed.classes.length} classes. Review before publishing.`
-    );
   } catch (error) {
-    redirectWithMessage(path, "error", (error as Error).message);
+    rethrowIfRedirect(error);
+    redirectWithMessage(path, "error", errorMessage(error));
   }
+
+  redirectWithMessage(
+    `/routine?reviewVersionId=${versionId}`,
+    "success",
+    `Routine parsed successfully! Discovered ${batchesCount} batches and ${classesCount} classes. Review before publishing.`
+  );
 }
 
 /**
@@ -134,7 +146,6 @@ export async function publishRoutineAction(formData: FormData) {
 
   if (!versionId) {
     redirectWithMessage(path, "error", "Missing routine version ID.");
-    return;
   }
 
   try {
@@ -146,13 +157,41 @@ export async function publishRoutineAction(formData: FormData) {
     revalidatePath("/home");
     revalidatePath("/routine");
     revalidatePath("/calendar");
-
-    redirectWithMessage(
-      "/routine",
-      "success",
-      "University routine successfully published! All students will now view the updated schedule."
-    );
   } catch (error) {
-    redirectWithMessage(path, "error", (error as Error).message);
+    rethrowIfRedirect(error);
+    redirectWithMessage(path, "error", errorMessage(error));
   }
+
+  redirectWithMessage(
+    "/routine",
+    "success",
+    "University routine successfully published! All students will now view the updated schedule."
+  );
+}
+
+/**
+ * Directly applies and activates Section 71_B routine for the user
+ */
+export async function applySection71BRoutineAction(formData: FormData) {
+  const path = returnTo(formData, "/routine");
+  let classesCreated = 0;
+  try {
+    const { supabase, user } = await requireUser();
+    const result = await syncUserWeeklyRoutine(supabase, user.id, "71_B");
+    classesCreated = result.classesCreated;
+
+    revalidatePath("/home");
+    revalidatePath("/routine");
+    revalidatePath("/calendar");
+    revalidatePath("/settings");
+  } catch (error) {
+    rethrowIfRedirect(error);
+    redirectWithMessage(path, "error", errorMessage(error));
+  }
+
+  redirectWithMessage(
+    path,
+    "success",
+    `Section 71_B routine active with ${classesCreated} classes!`
+  );
 }

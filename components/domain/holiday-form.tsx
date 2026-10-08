@@ -7,10 +7,12 @@ import { todayISO } from "@/lib/utils/dates";
 
 export function HolidayForm({
   returnTo = "/calendar",
-  compact = false
+  compact = false,
+  defaultDate
 }: {
   returnTo?: string;
   compact?: boolean;
+  defaultDate?: string;
 }) {
   return (
     <form action={createHolidayAction} className="space-y-4">
@@ -20,7 +22,7 @@ export function HolidayForm({
           <TextInput name="name" placeholder="University Holiday" required />
         </Field>
         <Field label="Date">
-          <TextInput name="date" type="date" defaultValue={todayISO()} required />
+          <TextInput name="date" type="date" defaultValue={defaultDate ?? todayISO()} required />
         </Field>
         <Field label="Repeat">
           <SelectInput name="repeatRule" defaultValue="NONE">

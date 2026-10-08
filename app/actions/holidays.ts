@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/data";
 import { createHolidaySchema, formBoolean, formString } from "@/lib/validation";
-import { parseId, redirectWithMessage, returnTo } from "@/app/actions/helpers";
+import {
+  errorMessage,
+  parseId,
+  redirectWithMessage,
+  returnTo,
+  rethrowIfRedirect
+} from "@/app/actions/helpers";
 
 export async function createHolidayAction(formData: FormData) {
   const path = returnTo(formData, "/calendar");
@@ -28,10 +34,11 @@ export async function createHolidayAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateHolidays();
-    redirectWithMessage(path, "success", "Holiday added.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Holiday added.");
 }
 
 export async function deleteHolidayAction(formData: FormData) {
@@ -47,18 +54,15 @@ export async function deleteHolidayAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateHolidays();
-    redirectWithMessage(path, "success", "Holiday deleted.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Holiday deleted.");
 }
 
 function revalidateHolidays() {
   revalidatePath("/home");
   revalidatePath("/routine");
   revalidatePath("/calendar");
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong.";
 }

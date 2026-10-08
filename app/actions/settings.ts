@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/data";
 import { formBoolean, formString, updateSettingsSchema } from "@/lib/validation";
-import { redirectWithMessage, returnTo } from "@/app/actions/helpers";
+import {
+  errorMessage,
+  redirectWithMessage,
+  returnTo,
+  rethrowIfRedirect
+} from "@/app/actions/helpers";
 
 export async function updateSettingsAction(formData: FormData) {
   const path = returnTo(formData, "/settings");
@@ -34,25 +39,27 @@ export async function updateSettingsAction(formData: FormData) {
     if (error) throw new Error(error.message);
     revalidatePath("/settings");
     revalidatePath("/home");
-    redirectWithMessage(path, "success", "Settings saved.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Settings saved.");
 }
 
 export async function finishSetupAction() {
-  const { supabase, user } = await requireUser();
-  const { error } = await supabase
-    .from("settings")
-    .update({ setup_completed: true, updated_at: new Date().toISOString() })
-    .eq("user_id", user.id);
+  try {
+    const { supabase, user } = await requireUser();
+    const { error } = await supabase
+      .from("settings")
+      .update({ setup_completed: true, updated_at: new Date().toISOString() })
+      .eq("user_id", user.id);
 
-  if (error) redirect(`/setup?error=${encodeURIComponent(error.message)}`);
-  revalidatePath("/home");
-  revalidatePath("/settings");
+    if (error) throw new Error(error.message);
+    revalidatePath("/home");
+    revalidatePath("/settings");
+  } catch (error) {
+    rethrowIfRedirect(error);
+    redirectWithMessage("/setup", "error", errorMessage(error));
+  }
   redirect("/home");
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong.";
 }

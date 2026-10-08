@@ -11,7 +11,13 @@ import {
   rescheduleTaskSchema,
   taskStatusSchema
 } from "@/lib/validation";
-import { parseId, redirectWithMessage, returnTo } from "@/app/actions/helpers";
+import {
+  errorMessage,
+  parseId,
+  redirectWithMessage,
+  returnTo,
+  rethrowIfRedirect
+} from "@/app/actions/helpers";
 
 export async function createTaskAction(formData: FormData) {
   const path = returnTo(formData, "/tasks");
@@ -52,18 +58,21 @@ export async function createTaskAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateEverywhere();
-    redirectWithMessage(path, "success", "Task added.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Task added.");
 }
 
 export async function setTaskStatusAction(formData: FormData) {
   const path = returnTo(formData, "/tasks");
+  let statusMessage = "Task updated.";
   try {
     const { supabase, user } = await requireUser();
     const id = parseId(formData);
     const status = taskStatusSchema.parse(formString(formData, "status"));
+    statusMessage = taskStatusMessage(status);
 
     const { data: current, error: currentError } = await supabase
       .from("tasks")
@@ -98,10 +107,11 @@ export async function setTaskStatusAction(formData: FormData) {
     });
 
     revalidateEverywhere();
-    redirectWithMessage(path, "success", taskStatusMessage(status));
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", statusMessage);
 }
 
 export async function rescheduleTaskAction(formData: FormData) {
@@ -153,10 +163,11 @@ export async function rescheduleTaskAction(formData: FormData) {
     });
 
     revalidateEverywhere();
-    redirectWithMessage(path, "success", "Task rescheduled.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Task rescheduled.");
 }
 
 export async function deleteTaskAction(formData: FormData) {
@@ -172,10 +183,11 @@ export async function deleteTaskAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateEverywhere();
-    redirectWithMessage(path, "success", "Task deleted.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Task deleted.");
 }
 
 function statusTimestamps(status: TaskStatus) {
@@ -201,8 +213,4 @@ function revalidateEverywhere() {
   revalidatePath("/tasks");
   revalidatePath("/calendar");
   revalidatePath("/insights");
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong.";
 }

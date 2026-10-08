@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { requireUser, getOrCreateActiveRoutine } from "@/lib/data";
 import { createClassSchema, formBoolean, formString } from "@/lib/validation";
-import { parseId, redirectWithMessage, returnTo } from "@/app/actions/helpers";
+import {
+  errorMessage,
+  parseId,
+  redirectWithMessage,
+  returnTo,
+  rethrowIfRedirect
+} from "@/app/actions/helpers";
 
 export async function createClassAction(formData: FormData) {
   const path = returnTo(formData, "/routine");
@@ -34,18 +40,20 @@ export async function createClassAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateRoutine();
-    redirectWithMessage(path, "success", "Class added.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Class added.");
 }
 
 export async function toggleClassAction(formData: FormData) {
   const path = returnTo(formData, "/routine");
+  let enabled = false;
   try {
     const { supabase, user } = await requireUser();
     const id = parseId(formData);
-    const enabled = formBoolean(formData, "enabled");
+    enabled = formBoolean(formData, "enabled");
     const { error } = await supabase
       .from("classes")
       .update({ enabled, updated_at: new Date().toISOString() })
@@ -54,10 +62,11 @@ export async function toggleClassAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateRoutine();
-    redirectWithMessage(path, "success", enabled ? "Class enabled." : "Class disabled.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", enabled ? "Class enabled." : "Class disabled.");
 }
 
 export async function cancelClassOccurrenceAction(formData: FormData) {
@@ -90,10 +99,11 @@ export async function cancelClassOccurrenceAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateRoutine();
-    redirectWithMessage(path, "success", "Class cancelled for this date.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Class cancelled for this date.");
 }
 
 export async function deleteClassAction(formData: FormData) {
@@ -109,18 +119,15 @@ export async function deleteClassAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateRoutine();
-    redirectWithMessage(path, "success", "Class deleted.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Class deleted.");
 }
 
 function revalidateRoutine() {
   revalidatePath("/home");
   revalidatePath("/routine");
   revalidatePath("/calendar");
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong.";
 }

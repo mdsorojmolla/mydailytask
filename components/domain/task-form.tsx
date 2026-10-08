@@ -7,13 +7,15 @@ import { todayISO, weekStartISO } from "@/lib/utils/dates";
 
 export function TaskForm({
   returnTo = "/tasks",
-  compact = false
+  compact = false,
+  defaultDate
 }: {
   returnTo?: string;
   compact?: boolean;
+  defaultDate?: string;
 }) {
-  const today = todayISO();
-  const weekStart = weekStartISO(new Date());
+  const today = defaultDate || todayISO();
+  const weekStart = weekStartISO(defaultDate ? new Date(`${defaultDate}T00:00:00`) : new Date());
 
   return (
     <form action={createTaskAction} className="space-y-4">

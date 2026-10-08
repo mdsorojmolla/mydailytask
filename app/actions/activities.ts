@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/data";
 import { createActivitySchema, formBoolean, formString } from "@/lib/validation";
-import { parseId, redirectWithMessage, returnTo } from "@/app/actions/helpers";
+import {
+  errorMessage,
+  parseId,
+  redirectWithMessage,
+  returnTo,
+  rethrowIfRedirect
+} from "@/app/actions/helpers";
 
 export async function createActivityAction(formData: FormData) {
   const path = returnTo(formData, "/settings");
@@ -34,18 +40,20 @@ export async function createActivityAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateActivities();
-    redirectWithMessage(path, "success", "Activity added.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Activity added.");
 }
 
 export async function toggleActivityAction(formData: FormData) {
   const path = returnTo(formData, "/settings");
+  let enabled = false;
   try {
     const { supabase, user } = await requireUser();
     const id = parseId(formData);
-    const enabled = formBoolean(formData, "enabled");
+    enabled = formBoolean(formData, "enabled");
     const { error } = await supabase
       .from("activities")
       .update({ enabled, updated_at: new Date().toISOString() })
@@ -54,14 +62,15 @@ export async function toggleActivityAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateActivities();
-    redirectWithMessage(
-      path,
-      "success",
-      enabled ? "Activity enabled." : "Activity disabled."
-    );
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(
+    path,
+    "success",
+    enabled ? "Activity enabled." : "Activity disabled."
+  );
 }
 
 export async function markActivityCompletedAction(formData: FormData) {
@@ -94,10 +103,11 @@ export async function markActivityCompletedAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateActivities();
-    redirectWithMessage(path, "success", "Activity completed.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Activity completed.");
 }
 
 export async function deleteActivityAction(formData: FormData) {
@@ -113,10 +123,11 @@ export async function deleteActivityAction(formData: FormData) {
 
     if (error) throw new Error(error.message);
     revalidateActivities();
-    redirectWithMessage(path, "success", "Activity deleted.");
   } catch (error) {
+    rethrowIfRedirect(error);
     redirectWithMessage(path, "error", errorMessage(error));
   }
+  redirectWithMessage(path, "success", "Activity deleted.");
 }
 
 function revalidateActivities() {
@@ -124,8 +135,4 @@ function revalidateActivities() {
   revalidatePath("/settings");
   revalidatePath("/calendar");
   revalidatePath("/insights");
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong.";
 }

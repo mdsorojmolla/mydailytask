@@ -1,6 +1,7 @@
 import type { RoutineBatch, RoutineClass, RoutineVersion, UUID } from "@/lib/domain";
 import { assertAdmin } from "@/lib/auth/admin";
 import { getOrCreateActiveRoutine } from "@/lib/data";
+import { DEFAULT_BATCH_CODE, OFFICIAL_ROUTINE_CLASSES_71_B } from "@/lib/routine/default-routine";
 
 type SupabaseClient = any;
 
@@ -29,9 +30,10 @@ export async function getPublishedRoutine(supabase: SupabaseClient): Promise<{
         .order("batch_code");
 
       const batches = (batchesData ?? []).map((b: any) => b.batch_code);
+      const uniqueBatches = Array.from(new Set([...batches, DEFAULT_BATCH_CODE]));
       return {
         version: mapRoutineVersion(version),
-        batches
+        batches: uniqueBatches
       };
     }
   } catch {
@@ -50,6 +52,8 @@ export async function getPublishedRoutine(supabase: SupabaseClient): Promise<{
 
     if (upload && upload.extracted_payload) {
       const payload = upload.extracted_payload;
+      const batches = payload.batches || [];
+      const uniqueBatches = Array.from(new Set([...batches, DEFAULT_BATCH_CODE]));
       return {
         version: {
           id: upload.id,
@@ -60,17 +64,32 @@ export async function getPublishedRoutine(supabase: SupabaseClient): Promise<{
           uploadedBy: upload.user_id,
           publishedAt: upload.updated_at || upload.created_at,
           createdAt: upload.created_at,
-          batchesCount: payload.batches?.length ?? 0,
-          classesCount: payload.classes?.length ?? 0
+          batchesCount: uniqueBatches.length,
+          classesCount: payload.classes?.length ?? OFFICIAL_ROUTINE_CLASSES_71_B.length
         },
-        batches: payload.batches || []
+        batches: uniqueBatches
       };
     }
   } catch {
     // Fallback safe
   }
 
-  return { version: null, batches: [] };
+  // 3. Official Built-in Section 71_B Routine
+  return {
+    version: {
+      id: "builtin-71-b-version",
+      versionName: "Routine 71_B (Official)",
+      sourceFile: null,
+      fileName: "Section_71_B.pdf",
+      status: "PUBLISHED",
+      uploadedBy: null,
+      publishedAt: "2026-10-09T00:00:00.000Z",
+      createdAt: "2026-10-09T00:00:00.000Z",
+      batchesCount: 1,
+      classesCount: OFFICIAL_ROUTINE_CLASSES_71_B.length
+    },
+    batches: [DEFAULT_BATCH_CODE]
+  };
 }
 
 /**
@@ -83,52 +102,73 @@ export async function getPublishedClassesForBatch(
   const { version } = await getPublishedRoutine(supabase);
   if (!version) return [];
 
-  try {
-    // 1. Try relational routine_classes table
-    const { data, error } = await supabase
-      .from("routine_classes")
-      .select("*")
-      .eq("routine_version_id", version.id)
-      .eq("batch_code", batchCode)
-      .order("day_of_week")
-      .order("start_time");
+  // 1. Try relational routine_classes table if not the builtin placeholder
+  if (version.id !== "builtin-71-b-version") {
+    try {
+      const { data, error } = await supabase
+        .from("routine_classes")
+        .select("*")
+        .eq("routine_version_id", version.id)
+        .eq("batch_code", batchCode)
+        .order("day_of_week")
+        .order("start_time");
 
-    if (!error && data && data.length > 0) {
-      return data.map(mapRoutineClass);
+      if (!error && data && data.length > 0) {
+        return data.map(mapRoutineClass);
+      }
+    } catch {
+      // Fallback
     }
-  } catch {
-    // Fallback to jsonb in routine_uploads
+
+    // 2. Fallback to routine_uploads jsonb
+    try {
+      const { data: upload } = await supabase
+        .from("routine_uploads")
+        .select("extracted_payload")
+        .eq("id", version.id)
+        .maybeSingle();
+
+      if (upload?.extracted_payload?.classes) {
+        const all: any[] = upload.extracted_payload.classes;
+        const matching = all.filter((c) => c.batchCode === batchCode);
+        if (matching.length > 0) {
+          return matching.map((c, idx) => ({
+            id: `rc-${idx}`,
+            routineVersionId: version.id,
+            batchCode: c.batchCode,
+            labGroup: c.labGroup ?? null,
+            dayOfWeek: c.dayOfWeek,
+            startTime: c.startTime,
+            endTime: c.endTime,
+            courseCode: c.courseCode,
+            teacher: c.teacher ?? null,
+            room: c.room ?? null,
+            classType: c.classType || "Theory",
+            roomType: c.roomType ?? null
+          }));
+        }
+      }
+    } catch {
+      // Fallback safe
+    }
   }
 
-  // 2. Fallback to routine_uploads jsonb
-  try {
-    const { data: upload } = await supabase
-      .from("routine_uploads")
-      .select("extracted_payload")
-      .eq("id", version.id)
-      .maybeSingle();
-
-    if (upload?.extracted_payload?.classes) {
-      const all: any[] = upload.extracted_payload.classes;
-      return all
-        .filter((c) => c.batchCode === batchCode)
-        .map((c, idx) => ({
-          id: `rc-${idx}`,
-          routineVersionId: version.id,
-          batchCode: c.batchCode,
-          labGroup: c.labGroup ?? null,
-          dayOfWeek: c.dayOfWeek,
-          startTime: c.startTime,
-          endTime: c.endTime,
-          courseCode: c.courseCode,
-          teacher: c.teacher ?? null,
-          room: c.room ?? null,
-          classType: c.classType || "Theory",
-          roomType: c.roomType ?? null
-        }));
-    }
-  } catch {
-    // Fallback safe
+  // 3. If batchCode is 71_B, provide the exact official 71_B routine
+  if (batchCode === DEFAULT_BATCH_CODE) {
+    return OFFICIAL_ROUTINE_CLASSES_71_B.map((c, idx) => ({
+      id: `builtin-71-b-${idx}`,
+      routineVersionId: version.id,
+      batchCode: c.batchCode,
+      labGroup: c.labGroup,
+      dayOfWeek: c.dayOfWeek,
+      startTime: c.startTime,
+      endTime: c.endTime,
+      courseCode: c.courseCode,
+      teacher: c.teacher,
+      room: c.room,
+      classType: c.classType,
+      roomType: c.roomType ?? null
+    }));
   }
 
   return [];

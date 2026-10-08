@@ -57,7 +57,7 @@ export function MobileNav() {
         <div className="flex flex-1 items-center justify-center -translate-y-5">
           <button
             type="button"
-            onClick={openQuickAdd}
+            onClick={() => openQuickAdd()}
             aria-label="Add new item"
             className="flex h-14 w-14 items-center justify-center rounded-full bg-[#5B4DFB] text-white shadow-[0_8px_24px_rgba(91,77,251,0.45)] ring-4 ring-white transition-all duration-200 hover:scale-105 active:scale-90"
           >

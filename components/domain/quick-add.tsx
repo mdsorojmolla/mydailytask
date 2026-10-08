@@ -8,9 +8,9 @@ import { ClassForm } from "@/components/domain/class-form";
 import { HolidayForm } from "@/components/domain/holiday-form";
 import { TaskForm } from "@/components/domain/task-form";
 
-export function openQuickAdd() {
+export function openQuickAdd(options?: { mode?: Mode; date?: string }) {
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("open-quick-add"));
+    window.dispatchEvent(new CustomEvent("open-quick-add", { detail: options }));
   }
 }
 
@@ -26,10 +26,16 @@ const modes: Array<{ id: Mode; label: string; icon: typeof Plus }> = [
 export function QuickAdd() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("task");
+  const [presetDate, setPresetDate] = useState<string | undefined>(undefined);
   const pathname = usePathname();
 
   useEffect(() => {
-    const handleOpen = () => setOpen(true);
+    const handleOpen = (e: Event) => {
+      const customEvent = e as CustomEvent<{ mode?: Mode; date?: string } | undefined>;
+      if (customEvent.detail?.mode) setMode(customEvent.detail.mode);
+      if (customEvent.detail?.date) setPresetDate(customEvent.detail.date);
+      setOpen(true);
+    };
     window.addEventListener("open-quick-add", handleOpen);
     return () => window.removeEventListener("open-quick-add", handleOpen);
   }, []);
@@ -95,13 +101,13 @@ export function QuickAdd() {
             </div>
 
             <div className="overflow-y-auto p-6 pb-[max(2rem,calc(1.5rem+env(safe-area-inset-bottom,0px)))] sm:pb-6">
-              {mode === "task" ? <TaskForm compact returnTo={pathname} /> : null}
+              {mode === "task" ? <TaskForm compact returnTo={pathname} defaultDate={presetDate} /> : null}
               {mode === "class" ? <ClassForm compact returnTo={pathname} /> : null}
               {mode === "activity" ? (
                 <ActivityForm compact returnTo={pathname} />
               ) : null}
               {mode === "holiday" ? (
-                <HolidayForm compact returnTo={pathname} />
+                <HolidayForm compact returnTo={pathname} defaultDate={presetDate} />
               ) : null}
             </div>
           </div>

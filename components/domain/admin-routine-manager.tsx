@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Upload, FileText, CheckCircle2, AlertCircle, ArrowUpRight, Sparkles, Layers, ShieldCheck } from "lucide-react";
 import type { RoutineVersion } from "@/lib/domain";
-import { uploadAndParseRoutineAction, publishRoutineAction } from "@/app/actions/university-routine";
+import { uploadAndParseRoutineAction, publishRoutineAction, applySection71BRoutineAction } from "@/app/actions/university-routine";
 
 interface AdminRoutineManagerProps {
   publishedVersion: RoutineVersion | null;
@@ -45,14 +45,26 @@ export function AdminRoutineManager({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowUpload(!showUpload)}
-          className="focus-ring inline-flex items-center gap-1.5 rounded-2xl bg-[#5B4DFB] px-3.5 py-2 text-xs font-bold text-white shadow-glow hover:bg-[#483AE3] active:scale-95 transition"
-        >
-          <Upload size={14} strokeWidth={2.5} />
-          <span>Upload PDF</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <form action={applySection71BRoutineAction} className="inline-flex">
+            <button
+              type="submit"
+              className="focus-ring inline-flex items-center gap-1.5 rounded-2xl bg-[#EEECFE] px-3.5 py-2 text-xs font-bold text-[#5B4DFB] hover:bg-[#E3E0FE] active:scale-95 transition"
+            >
+              <Sparkles size={14} strokeWidth={2.5} />
+              <span>Apply Section 71_B</span>
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => setShowUpload(!showUpload)}
+            className="focus-ring inline-flex items-center gap-1.5 rounded-2xl bg-[#5B4DFB] px-3.5 py-2 text-xs font-bold text-white shadow-glow hover:bg-[#483AE3] active:scale-95 transition"
+          >
+            <Upload size={14} strokeWidth={2.5} />
+            <span>Upload PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Active Published Routine Summary */}

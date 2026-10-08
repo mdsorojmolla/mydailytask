@@ -14,9 +14,10 @@ import type {
 } from "@/lib/domain";
 import { buildDailySchedule } from "@/lib/schedule/engine";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { parseISODate, weekStartISO } from "@/lib/utils/dates";
+import { isSameHolidayDate, parseISODate, repeatMatchesDate, weekStartISO } from "@/lib/utils/dates";
 import { isAdminUser } from "@/lib/auth/admin";
-import { getAllRoutineVersions, getPublishedRoutine } from "@/lib/routine/store";
+import { getAllRoutineVersions, getPublishedRoutine, syncUserWeeklyRoutine } from "@/lib/routine/store";
+import { DEFAULT_BATCH_CODE, OFFICIAL_ROUTINE_CLASSES_71_B } from "@/lib/routine/default-routine";
 
 export const requireUser = cache(async () => {
   const supabase = await createServerSupabaseClient();
@@ -33,6 +34,10 @@ export const requireUser = cache(async () => {
 
   if (!settings.selectedBatch && typeof user.user_metadata?.selected_batch === "string") {
     settings.selectedBatch = user.user_metadata.selected_batch;
+  }
+
+  if (!settings.selectedBatch) {
+    settings.selectedBatch = DEFAULT_BATCH_CODE;
   }
 
   return { supabase, user, settings };
@@ -56,6 +61,116 @@ export async function getScheduleForDate(date: string) {
   const { supabase, user, settings } = await requireUser();
   const source = await getScheduleSource(supabase, user.id, settings, date);
   return buildDailySchedule({ date, source });
+}
+
+export interface MonthDayIndicator {
+  date: string;
+  classCount: number;
+  taskCount: number;
+  holidayNames: string[];
+  activityCount: number;
+  totalCount: number;
+}
+
+export type MonthOverview = Record<string, MonthDayIndicator>;
+
+export async function getMonthOverview(year: number, month: number): Promise<MonthOverview> {
+  const { supabase, user } = await requireUser();
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+
+  const [
+    routine,
+    classesResult,
+    exceptionsResult,
+    activitiesResult,
+    tasksResult,
+    holidaysResult
+  ] = await Promise.all([
+    getOrCreateActiveRoutine(supabase, user.id),
+    supabase.from("classes").select("*").eq("user_id", user.id),
+    supabase
+      .from("class_exceptions")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("date", startDate)
+      .lte("date", endDate),
+    supabase.from("activities").select("*").eq("user_id", user.id),
+    supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("date", startDate)
+      .lte("date", endDate),
+    supabase.from("holidays").select("*").eq("user_id", user.id)
+  ]);
+
+  if (classesResult.error) throw new Error(classesResult.error.message);
+  if (exceptionsResult.error) throw new Error(exceptionsResult.error.message);
+  if (activitiesResult.error) throw new Error(activitiesResult.error.message);
+  if (tasksResult.error) throw new Error(tasksResult.error.message);
+  if (holidaysResult.error) throw new Error(holidaysResult.error.message);
+
+  let activeClasses = (classesResult.data ?? [])
+    .filter((c: any) => c.routine_id === routine.id && c.enabled)
+    .map(mapClass);
+
+  if (activeClasses.length === 0) {
+    activeClasses = OFFICIAL_ROUTINE_CLASSES_71_B.map((rc, idx) => ({
+      id: `builtin-71b-${idx}`,
+      userId: user.id,
+      routineId: routine.id,
+      courseName: rc.labGroup ? `${rc.courseCode} (${rc.labGroup})` : rc.courseCode,
+      teacher: rc.teacher,
+      room: rc.room,
+      dayOfWeek: rc.dayOfWeek,
+      startTime: rc.startTime,
+      endTime: rc.endTime,
+      enabled: true,
+      reminderEnabled: true
+    }));
+  }
+
+  const exceptions = (exceptionsResult.data ?? []).map(mapClassException);
+  const activities = (activitiesResult.data ?? []).filter((a: any) => a.enabled).map(mapActivity);
+  const tasks = (tasksResult.data ?? []).map(mapTask);
+  const holidays = (holidaysResult.data ?? []).map(mapHoliday);
+
+  const overview: MonthOverview = {};
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const dayOfWeek = parseISODate(dateStr).getDay();
+
+    const dayHolidays = holidays.filter((h) => isSameHolidayDate(h, dateStr));
+    const affectsClasses = dayHolidays.some((h) => h.affectsClasses);
+    const dayExceptions = new Set(
+      exceptions.filter((e) => e.date === dateStr).map((e) => e.classId)
+    );
+
+    const classCount = affectsClasses
+      ? 0
+      : activeClasses.filter(
+          (c) => c.dayOfWeek === dayOfWeek && !dayExceptions.has(c.id)
+        ).length;
+
+    const taskCount = tasks.filter((t) => t.date === dateStr).length;
+    const activityCount = activities.filter((a) =>
+      repeatMatchesDate(a.repeatRule, dateStr)
+    ).length;
+
+    overview[dateStr] = {
+      date: dateStr,
+      classCount,
+      taskCount,
+      holidayNames: dayHolidays.map((h) => h.name),
+      activityCount,
+      totalCount: classCount + taskCount + dayHolidays.length + activityCount
+    };
+  }
+
+  return overview;
 }
 
 export async function getTasksPageData() {
@@ -104,9 +219,43 @@ export async function getRoutinePageData() {
   if (classesResult.error) throw new Error(classesResult.error.message);
   if (holidaysResult.error) throw new Error(holidaysResult.error.message);
 
-  const classes = (classesResult.data ?? [])
+  let classes = (classesResult.data ?? [])
     .filter((c: any) => c.routine_id === routine.id)
     .map(mapClass);
+
+  if (classes.length === 0) {
+    try {
+      await syncUserWeeklyRoutine(supabase, user.id, DEFAULT_BATCH_CODE);
+      const reloaded = await supabase
+        .from("classes")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("routine_id", routine.id)
+        .order("day_of_week")
+        .order("start_time");
+      if (reloaded.data && reloaded.data.length > 0) {
+        classes = reloaded.data.map(mapClass);
+      }
+    } catch {
+      // Fallback
+    }
+
+    if (classes.length === 0) {
+      classes = OFFICIAL_ROUTINE_CLASSES_71_B.map((rc, idx) => ({
+        id: `builtin-71b-${idx}`,
+        userId: user.id,
+        routineId: routine.id,
+        courseName: rc.labGroup ? `${rc.courseCode} (${rc.labGroup})` : rc.courseCode,
+        teacher: rc.teacher,
+        room: rc.room,
+        dayOfWeek: rc.dayOfWeek,
+        startTime: rc.startTime,
+        endTime: rc.endTime,
+        enabled: true,
+        reminderEnabled: true
+      }));
+    }
+  }
 
   return {
     user,
@@ -226,9 +375,25 @@ async function getScheduleSource(
   }
 
   // Filter classes for the active routine in memory
-  const activeClasses = (classesResult.data ?? [])
+  let activeClasses = (classesResult.data ?? [])
     .filter((c: any) => c.routine_id === routine.id)
     .map(mapClass);
+
+  if (activeClasses.length === 0) {
+    activeClasses = OFFICIAL_ROUTINE_CLASSES_71_B.map((rc, idx) => ({
+      id: `builtin-71b-${idx}`,
+      userId: userId,
+      routineId: routine.id,
+      courseName: rc.labGroup ? `${rc.courseCode} (${rc.labGroup})` : rc.courseCode,
+      teacher: rc.teacher,
+      room: rc.room,
+      dayOfWeek: rc.dayOfWeek,
+      startTime: rc.startTime,
+      endTime: rc.endTime,
+      enabled: true,
+      reminderEnabled: true
+    }));
+  }
 
   return {
     settings,
